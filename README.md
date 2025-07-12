@@ -3,7 +3,7 @@
 </p>
 <!-- centred logo -->
 <h1 align="left" style="margin:24px 0;">
-  MIRAGE: Multimodal Intelligent RAG Engine for Clinically Grounded Medical Reasoning
+  MIRAGE: Multimodal RAG Engine for Interpretable Medical Analysis
 </h1>
 
 <!-- bottom full-width GIF -->
@@ -30,3 +30,5 @@ Introducing Multimodal Intelligent RAG Engine for Clinically Grounded Medical Re
  <img src="images/Architecture.png" width="800"/>
 </div>
 -->
+
+
