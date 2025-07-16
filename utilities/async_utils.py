@@ -138,5 +138,32 @@ async def _process_with_retry(
     """
     Process a single item with retry logic
     return tuple of (result, number of retries used)
-
     """
+    retries = 0
+    last_exception = None
+
+    while retries < num_retries:
+        try:
+            if params_as_kwargs:
+                if isinstance(item, dict):
+                    kwargs.update(item)
+                    result = await func(*args, **kwargs)
+                else:
+                    result = await func(item, *args, **kwargs)
+            else:
+                result = await func(item, *args, **kwargs)
+            return result, retries
+        except Exception as e:
+            raise e
+
+        except Exception as e:
+            last_exception = e
+            retries += 1
+            if retries <= num_retries:
+                # Exponential backoff
+                await asyncio.sleep(retry_delay + retries)
+            logger.warning(
+                f'Attempt {retries}/{num_retries+1}{str(e)}\n{traceback.format_exc()}'
+            )
+
+    raise last_exception
