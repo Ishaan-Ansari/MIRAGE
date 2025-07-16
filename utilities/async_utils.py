@@ -70,6 +70,7 @@ async def process_async_in_batches(
                 func=func,
                 item=item,
                 num_retries=num_retries,
+                retry_delay=retry_delay,
                 params_as_kwargs=params_as_kwargs,
                 args=args,
                 kwargs=kwargs,
@@ -80,12 +81,7 @@ async def process_async_in_batches(
         batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
 
         for item, result in zip(batch, batch_results):
-            if isinstance(result, NonRetryableError) and len(result)==2:
-                results_value, retries = result
-                results.append(results_value)
-                total_retries += 1
-
-            elif isinstance(result, NonRetryableError):
+            if isinstance(result, NonRetryableError):
                 raise result
 
             elif isinstance(result, Exception):
@@ -93,8 +89,14 @@ async def process_async_in_batches(
                 failed_items.append((item, result))
                 logger.error(f'Failed to process the item: {result}')
 
+            elif isinstance(result, tuple) and len(result)==2:
+                results_value, retries = result
+                results.append(results_value)
+                total_retries += retries
+
             else:
                 logger.error(f'Unexpected result format for the item: {item}')
+                results.append(None)
                 failed_items.append(
                     (item, BatchProcessingError("Unexpected result format")),
                 )
@@ -106,22 +108,22 @@ async def process_async_in_batches(
                 f"{(len(items) + batch_size - 1) // batch_size}"
             )
 
-            execution_time = (datetime.now() - start).total_seconds()
+    execution_time = (datetime.now() - start).total_seconds()
 
-            logger.info(
-                f"Batch processing completed. "
-                f"Successful: {len(results) - len(failed_items)}. "
-                f"Failed items: {len(failed_items)}. "
-                f"Total retries: {total_retries}. "
-                f"Execution time: {execution_time:.2f}s."
-            )
+    logger.info(
+        f"Batch processing completed. "
+        f"Successful: {len(results) - len(failed_items)}. "
+        f"Failed items: {len(failed_items)}. "
+        f"Total retries: {total_retries}. "
+        f"Execution time: {execution_time:.2f}s."
+    )
 
-            return BatchResult(
-                results=results,
-                failed_items=failed_items,
-                total_retries=total_retries,
-                execution_time=execution_time,
-            )
+    return BatchResult(
+        results=results,
+        failed_items=failed_items,
+        total_retries=total_retries,
+        execution_time=execution_time,
+    )
 
 
 async def _process_with_retry(
@@ -133,4 +135,8 @@ async def _process_with_retry(
         *args,
         **kwargs,
 ) -> tuple[Any, int]:
-    pass
+    """
+    Process a single item with retry logic
+    return tuple of (result, number of retries used)
+
+    """
