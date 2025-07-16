@@ -1,7 +1,7 @@
 import asyncio
 import traceback
 from datetime import datetime, time
-from typing import Any, Callable, List, TypeVar
+from typing import Any, Callable, List, TypeVar, Union
 
 from attrs import define
 
@@ -134,7 +134,7 @@ async def _process_with_retry(
         params_as_kwargs: bool,
         *args,
         **kwargs,
-) -> tuple[Any, int]:
+) -> Union[tuple[Any, int], Exception]:
     """
     Process a single item with retry logic
     return tuple of (result, number of retries used)
@@ -142,28 +142,33 @@ async def _process_with_retry(
     retries = 0
     last_exception = None
 
-    while retries < num_retries:
+    while retries <= num_retries:
         try:
             if params_as_kwargs:
                 if isinstance(item, dict):
-                    kwargs.update(item)
-                    result = await func(*args, **kwargs)
+                    merged_kwargs = {**kwargs, **item}
+                    result = await func(*args, **merged_kwargs)
                 else:
-                    result = await func(item, *args, **kwargs)
+                    result = await func(*args, **kwargs, item=item)
             else:
                 result = await func(item, *args, **kwargs)
             return result, retries
-        except Exception as e:
-            raise e
+        except NonRetryableError:
+            raise
 
         except Exception as e:
             last_exception = e
             retries += 1
             if retries <= num_retries:
                 # Exponential backoff
-                await asyncio.sleep(retry_delay + retries)
-            logger.warning(
-                f'Attempt {retries}/{num_retries+1}{str(e)}\n{traceback.format_exc()}'
-            )
+                backoff_time = retry_delay * (2 ** (retries - 1))
+                await asyncio.sleep(backoff_time)
+                logger.warning(
+                    f'Attempt {retries}/{num_retries+1} failed for item {item}: {str(e)}\n{traceback.format_exc()}'
+                )
+
+            else:
+                logger.info(f'All {retries} attempts failed for item {item} : {str(e)}')
+
 
     raise last_exception
