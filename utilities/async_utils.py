@@ -1,13 +1,31 @@
 import asyncio
 import traceback
-from datetime import datetime, time
+from datetime import datetime
 from typing import Any, Callable, List, TypeVar, Union
 
-from attrs import define
+from attrs import define  # define - decorator
 
 from logger import loggerUtils as logger
 
+# Callable[..., T] - A function that return T
+# TypeVar('T') - A generic type placeholders
+# Whenever you see T in these signature, it should consistently be something like 'int' or 'str' or whatever
+# my function returns
+# Union[A, B] - This value can be either A or a B
+# we automatically get:
+# __init__ -> that takes those 4 fields in order
+# __repr__ -> a dunder method that defines how an object is represented as string
+
 T = TypeVar('T')
+# Lets you write generic functions & classes in Py.
+"""
+from typing import TypeVar
+
+T = TypeVar('T')
+
+def identity(x: T) -> T:
+    return x
+"""
 
 @define
 class BatchResult:
@@ -37,7 +55,7 @@ async def process_async_in_batches(
         **kwargs,
 )->BatchResult:
     """
-    Prcess items in batches with retry logic
+    Process items in batches with retry logic
 
     Args:
     func (Callable[...,T]): Function to execute
