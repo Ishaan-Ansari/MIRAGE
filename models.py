@@ -37,7 +37,7 @@ class RAGDocument(PostGresBase):
             "summary": self.summary,
             "verified": self.verified,
         },
-        indent=4,
+        indent=4, default=str
     )
 
 class RAGDocumentChunk(PostGresBase):
