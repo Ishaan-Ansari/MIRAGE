@@ -48,7 +48,7 @@ class RAGDocumentChunk(PostGresBase):
     chunk_embedding = Column(Vector(1536))
 
     @declared_attr
-    def docment_id(cls):
+    def document_id(cls):
         pass
 
     @declared_attr
@@ -57,7 +57,7 @@ class RAGDocumentChunk(PostGresBase):
 
     def __repr__(self) -> str:
         return json.dumps(
-            {"document_id": self.docment_id, "chunk_text": self.chunk_text, "chunk_embedding": self.chunk_embedding},
+            {"document_id": self.document_id, "chunk_text": self.chunk_text, "chunk_embedding": self.chunk_embedding},
             indent=4,
         )
 
@@ -71,5 +71,48 @@ class RAGClassFactory:
             cls,
             pipeline_name: str,
     ) -> Tuple[Type[RAGDocument], Type[RAGDocumentChunk]]:
-        pass
+        document_class_name = f"{pipeline_name.title().replace('_', '')}Document"
+        document_table_name = f"{pipeline_name}_document"
 
+        document_chunks_table_name = document_class_name.replace(
+            "Document", "DocumentChunks"
+        )
+
+        document_chunks_class_name =  f"{pipeline_name}_documentChunks"
+
+        if pipeline_name in cls._CLASS_REGISTRY.keys():
+            return cls._CLASS_REGISTRY[pipeline_name]
+
+        DocumentClass = type(
+            document_class_name,
+            (RAGDocument,),
+            {
+                "__abstract__": False,
+                "__tablename__": document_table_name,
+                "chunks": relationship(
+                    f"{document_chunks_class_name}", back_populates="document",
+                ),
+                "__table_args__": {"extend_existing": True},
+            }
+        )
+
+        DocumentChunksClass = type(
+            document_chunks_class_name,
+            (RAGDocumentChunk,),
+            {
+                "__abstract__": False,
+                "__tablename__": document_chunks_class_name,
+                "document_id": Column(
+                    Integer,
+                    ForeignKey(f"{document_table_name}.id", ondelete="CASCADE"),
+                    nullable=False,
+                ),
+                "document": relationship(
+                    f"{document_class_name}", back_populates="chunks",
+                ),
+                "__table_args__": {"extend_existing": True},
+            },
+        )
+
+        cls._CLASS_REGISTRY[pipeline_name] = (DocumentClass, DocumentChunksClass)
+        return cls._CLASS_REGISTRY[pipeline_name]
