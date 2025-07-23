@@ -116,3 +116,13 @@ class RAGClassFactory:
 
         cls._CLASS_REGISTRY[pipeline_name] = (DocumentClass, DocumentChunksClass)
         return cls._CLASS_REGISTRY[pipeline_name]
+
+    @classmethod
+    def get_registered_pipelines(cls) -> list[str]:
+        """Get list of all registered pipeline names."""
+        return list(cls._CLASS_REGISTRY.keys())
+
+    @classmethod
+    def clear_registered_pipelines(cls) -> None:
+        """Clear the class registry (useful for testing)"""
+        cls._CLASS_REGISTRY.clear()
