@@ -1,0 +1,22 @@
+[project]
+name = "mirage"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "black>=25.11.0",
+    "torch>=2.0.0",
+    "transformers>=4.30.0",
+    "sentence-transformers>=2.2.2",
+    "faiss-cpu",
+    "datasets",
+    "Pillow",
+    "tqdm",
+    "accelerate",
+    "flask",
+    "fastapi",
+    "uvicorn",
+    "python-dotenv",
+    "pytest",
+]

@@ -1,0 +1,12 @@
+torch>=2.0.0
+transformers>=4.30.0
+sentence-transformers>=2.2.2
+faiss-cpu
+datasets
+Pillow
+tqdm
+accelerate
+flask
+fastapi
+uvicorn
+python-dotenv
