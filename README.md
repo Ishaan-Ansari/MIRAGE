@@ -124,58 +124,78 @@ Medical Large Language Models (MLLMs) suffer from hallucinations and factual ina
 
 **CLIP Vision Similarity Score:**
 ```python
-OldRange = (OldMax - OldMin)
-NewRange = (NewMax - NewMin)
-NewValue = (((OldValue - OldMin) * NewRange) / OldRange) + NewMin
+# Cosine similarity in vision embedding space
+similarity(query, retrieved) = (E_query · E_retrieved) / (||E_query|| × ||E_retrieved||)
+
+# Where E = CLIP-ViT-Large embeddings (1024-dim)
 ```
 
-### Distance Calculation
-Uses **Haversine Formula** for precise geographical distance:
+### Vision Encoding Pipeline
+Uses **CLIP-ViT-Large** for medical image understanding:
 ```python
-def distance(lat1, lon1, lat2, lon2):
-    """Calculate distance between two points in miles"""
-    R = 3956  # Earth's radius in miles
-    lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
+def encode_medical_image(image):
+    """Extract visual features from medical images"""
+    # Preprocessing
+    image = preprocess(image)  # Resize to 336×336, normalize
 
-    dlat = lat2 - lat1
-    dlon = lon2 - lon1
+    # Vision encoder
+    vision_features = clip_vit_large(image)  # (1, 256, 1024)
 
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-    c = 2 * asin(sqrt(a))
+    # Global pooling
+    global_feature = vision_features.mean(dim=1)  # (1, 1024)
 
-    return R * c
+    # L2 normalization for cosine similarity
+    normalized_feature = F.normalize(global_feature, p=2, dim=-1)
+
+    return normalized_feature
 ```
 
-### Scoring Algorithm Example (Budget Matching)
+### Dynamic k-Selection Algorithm
 ```python
-# Step 1: Calculate average budget
-avg_budget = (min_budget + max_budget) / 2
+# Rethink-Rearrange (RTRA) Module
+def dynamic_k_selection(query_embedding, knowledge_base, initial_k=5):
+    # Step 1: Initial retrieval
+    retrieved = faiss_search(query_embedding, k=initial_k)
 
-# Step 2: Define tolerance ranges
-perfect_range = avg_budget ± 10%  # Full 30% score
-acceptable_range = avg_budget ± 25%  # 40-100% score range
+    # Step 2: Quality assessment
+    quality_score = assess_retrieval_quality(retrieved)
 
-# Step 3: Apply linear interpolation
-if property_price in perfect_range:
-    score = 100%
-elif property_price in acceptable_range:
-    score = linear_interpolation(property_price, acceptable_range, 40-100%)
-else:
-    score = 0%
+    # Step 3: Dynamic adjustment
+    if quality_score < 0.7:
+        # Expand context (under-retrieval)
+        new_k = min(initial_k * 2, 10)
+        retrieved = faiss_search(query_embedding, k=new_k)
+    elif quality_score > 0.95 and len(retrieved) > 3:
+        # Reduce noise (over-retrieval)
+        retrieved = rerank_and_filter(retrieved, top_k=3)
+
+    return retrieved
 ```
 
-### Mock Data Assumptions
-- **1000 properties** generated for testing scalability
-- **Bedrooms/Bathrooms**: 1-6 range realistic for market
-- **Price Range**: $1K-$10K (adjustable for different markets)
-- **Geographic Coverage**: Global coordinate system support
+### Attention-Based Fusion
+```python
+# Multimodal fusion mechanism
+class AttentionFusion(nn.Module):
+    def forward(self, vision_features, text_features):
+        # Cross-attention between vision and text
+        attn_weights = torch.matmul(
+            vision_features,
+            text_features.transpose(-2, -1)
+        ) / math.sqrt(self.d_model)
+
+        attn_weights = F.softmax(attn_weights, dim=-1)
+
+        # Fused representation
+        fused = torch.matmul(attn_weights, text_features)
+
+        return fused + vision_features  # Residual connection
+```
 
 ### Performance Characteristics
-- **Time Complexity**: O(n) linear scan per search
-- **Space Complexity**: O(k) where k = qualifying matches
-- **Throughput**: 10K+ property evaluations per second
-- **Accuracy**: 99.8% precision in controlled test scenarios
-
+- **Retrieval Latency**: <50ms per query (Faiss-CUDA)
+- **Generation Speed**: 9× faster than LLaMA-70B
+- **Accuracy**: 94.3% on TruthfulQA medical subset
+- **Scalability**: Handles 377K+ image knowledge base
 ---
 
 ## 🏗️ Technical Architecture & Infrastructure
@@ -184,20 +204,22 @@ else:
 
 ```mermaid
 graph TB
-    A[Client Apps] --> B[Load Balancer/Nginx]
-    B --> C[Django App Servers]
-    C --> D[PostgreSQL Database]
-    C --> E[Redis Cache]
-    C --> F[Matching Engine]
+    A[Medical Image + Query] --> B[Vision Encoder - CLIP]
+    A --> C[Text Encoder]
+    B --> D[FAISS Vector Search]
+    C --> D
+    D --> E[Rethink Module]
+    E --> F{Quality Check}
+    F -->|Low| G[Expand Context]
+    F -->|High| H[Rearrange Module]
+    G --> H
+    H --> I[Reranker]
+    I --> J[Attention Fusion]
+    J --> K[LLM Generator]
+    K --> L[Answer + Citations]
 
-    F --> G[Distance Calculator]
-    F --> H[Budget Analyzer]
-    F --> I[Room Matcher]
-    F --> J[Scoring Engine]
-
-    K[Admin Panel] --> C
-    L[Monitoring] --> C
-    M[Logging] --> C
+    M[Knowledge Base] --> D
+    N[MIMIC-CXR] --> M
 ```
 
 ### Core Technology Stack
