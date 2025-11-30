@@ -236,71 +236,74 @@ graph TB
 
 ### Microservices Breakdown
 
-#### 1. **Property Matching Service** (`PropertyMatcher`)
+### Microservices Breakdown
+
+#### 1. **Vision Encoding Service** (`VisionEncoder`)
 ```python
-class PropertyMatcher:
-    """Core matching algorithm with configurable weights"""
-    - calculate_distance_match()
-    - calculate_budget_match()
-    - calculate_room_match()
-    - find_matches()
+class MIRAVisionEncoder:
+    """CLIP-based medical image encoder"""
+    - encode_image()           # Extract 1024-dim features
+    - batch_encode()           # Batch processing for efficiency
+    - get_patch_embeddings()   # 16×16 spatial features
 ```
 
-#### 2. **Geospatial Service** (`GeoCalculator`)
+#### 2. **Retrieval Service** (`MultimodalRetriever`)
 ```python
-class GeoCalculator:
-    """High-performance distance calculations"""
-    - haversine_distance()
-    - spatial_indexing()
-    - radius_search()
+class MultimodalRetriever:
+    """Hybrid vision-text retrieval system"""
+    - build_index()            # Create Faiss index
+    - retrieve_similar_cases() # Top-k similarity search
+    - hybrid_retrieval()       # Combine vision + text scores
 ```
 
-#### 3. **Notification Service** (`MatchNotifier`)
+#### 3. **Dynamic Context Controller** (`RTRAModule`)
 ```python
-class MatchNotifier:
-    """Real-time match notifications"""
-    - send_match_alerts()
-    - batch_notifications()
-    - preference_filtering()
+class RTRAModule:
+    """Rethink-Rearrange context optimization"""
+    - assess_quality()         # Score retrieval coherence
+    - dynamic_k_selection()    # Adjust context window
+    - iterative_refinement()   # Multi-round improvement
 ```
 
 ### Database Schema Design
 
-```sql
--- Optimized for 100M+ records with spatial indexing
-CREATE TABLE properties (
-    id SERIAL PRIMARY KEY,
-    location GEOGRAPHY(POINT, 4326),  -- PostGIS spatial type
-    price DECIMAL(12,2) NOT NULL,
-    bedrooms INTEGER NOT NULL,
-    bathrooms INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
+```python
+# Vector store structure
+class MedicalCase:
+    id: str                          # MIMIC-CXR identifier
+    image_path: str                  # S3/local path
+    vision_embedding: np.ndarray     # (1024,) CLIP features
+    text_embedding: np.ndarray       # (768,) BERT features
+    findings: str                    # Radiology report
+    diagnosis: str                   # Clinical labels
+    metadata: dict                   # Patient info, imaging params
 
-    -- Spatial index for fast geo queries
-    SPATIAL INDEX location_idx (location),
-    INDEX price_idx (price),
-    INDEX rooms_idx (bedrooms, bathrooms)
-);
-
-CREATE TABLE property_requirements (
-    id SERIAL PRIMARY KEY,
-    search_location GEOGRAPHY(POINT, 4326),
-    budget_range NUMRANGE,  -- PostgreSQL range type
-    bedroom_range INT4RANGE,
-    bathroom_range INT4RANGE,
-    created_at TIMESTAMP DEFAULT NOW()
-);
+# Faiss index configuration
+index = faiss.IndexFlatIP(1024)      # Inner product for cosine sim
+index = faiss.index_cpu_to_gpu(index, 0)  # GPU acceleration
 ```
 
 ### Containerization & Deployment
 
 #### Docker Production Stack
 ```dockerfile
-# Multi-stage build for optimized production image
-FROM python:3.12-slim as base
-# Security: Non-root user, minimal attack surface
-# Performance: Optimized layers, cached dependencies
-# Monitoring: Health checks, graceful shutdowns
+# Multi-stage build for MIRA
+FROM pytorch/pytorch:2.0.1-cuda11.8-cudnn8-runtime as base
+
+# Install medical imaging dependencies
+RUN pip install transformers>=4.37.0 \
+    faiss-gpu \
+    open-clip-torch \
+    sentence-transformers \
+    pydicom nibabel  # Medical image formats
+
+# Copy model weights
+COPY models/ /app/models/
+COPY data/indexes/ /app/indexes/
+
+# Health check endpoint
+HEALTHCHECK --interval=30s --timeout=10s \
+  CMD curl -f http://localhost:8000/health/ || exit 1
 ```
 
 #### Kubernetes Deployment
@@ -308,24 +311,26 @@ FROM python:3.12-slim as base
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: property-advisor
+  name: mira-inference
 spec:
-  replicas: 5
-  strategy:
-    rollingUpdate:
-      maxSurge: 50%
-      maxUnavailable: 25%
+  replicas: 3
   template:
     spec:
       containers:
-      - name: app
+      - name: mira-api
+        image: mira:v1.0
         resources:
           requests:
-            memory: "512Mi"
-            cpu: "250m"
+            memory: "8Gi"
+            nvidia.com/gpu: 1
           limits:
-            memory: "1Gi"
-            cpu: "500m"
+            memory: "16Gi"
+            nvidia.com/gpu: 1
+        env:
+        - name: FAISS_GPU
+          value: "true"
+        - name: MODEL_PATH
+          value: "/app/models/clip-vit-large"
 ```
 
 ### API Gateway & Service Mesh
