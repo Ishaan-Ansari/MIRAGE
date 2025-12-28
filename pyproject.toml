@@ -20,4 +20,5 @@ dependencies = [
     "python-dotenv",
     "pytest",
     "chonkie>=1.4.2",
+    "timm",
 ]
