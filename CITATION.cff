@@ -1,0 +1,12 @@
+cff-version: 1.0.0
+message: If you use this software, please cite it as below.
+authors:
+    - given-names: Ishaan Ansari
+title: "MIRAGE: Multimodal Retrieval-Augmented Generation for Factual Accuracy in Healthcare"
+version: 1.0.0
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.1234
+  - type: url
+    value: https://github.com/Ishaan-ansari/MIRAGE
+date-released: TBD
