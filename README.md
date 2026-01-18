@@ -704,4 +704,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ```
 ---
 
-**Built for advancing the future of AI in healthcare modern Python practices**
+**Built for empowering healthcare industry with AI-driven medical diagnosis**
